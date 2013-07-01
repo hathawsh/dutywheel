@@ -51,21 +51,17 @@ var activate_wheel;
     }
 
     function Slice(num, slice_count) {
-        var hue;
-
         this.num = num;
-        hue = 360 * num / slice_count;
-        this.stop0 = hsva_str(hue, 0, 1, 1);
-        this.stop1 = hsva_str(hue, 0, 1, 1);
-        this.stop2 = hsva_str(hue, 0.3, 1, 1);
-        this.stop3 = hsva_str(hue, 0.1, 1, 1);
-        this.stop4 = hsva_str(hue, 1, 1, 1);
-        this.stop5 = hsva_str(hue, 1, 0.8, 1);
-        this.stop6 = hsva_str(hue, 0.8, 1, 1);
+        this.hue = 360 * num / slice_count;
+        this.saturation = 1;
+        this.value = 1;
+        this.text = 'Refreshment ' + (num + 1);
     }
 
     function draw_wheel(canvas, slices) {
-        var ctx, full_radius, gradient, s0, e0, s1, e1, s2, e2, i;
+        var ctx, full_radius, gradient, s0, e0, s1, e1, s2, e2, i, h, s, v,
+            text, text_circumference, text_height, text_width, max_text_width,
+            text_x, j, text_angles;
 
         ctx = canvas.getContext('2d');
         full_radius = Math.min(canvas.width, canvas.height) / 2;
@@ -84,18 +80,31 @@ var activate_wheel;
 
         for (i = 0; i < slices.length; i += 1) {
             ctx.save();
-
-            gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, full_radius);
-            gradient.addColorStop(0, slices[i].stop0);
-            gradient.addColorStop(0.23, slices[i].stop1);
-            gradient.addColorStop(0.24, slices[i].stop2);
-            gradient.addColorStop(0.25, slices[i].stop3);
-            gradient.addColorStop(0.84, slices[i].stop4);
-            gradient.addColorStop(0.85, slices[i].stop5);
-            gradient.addColorStop(1, slices[i].stop6);
-            ctx.fillStyle = gradient;
             ctx.rotate(i * Math.PI * 2 / slices.length);
 
+            h = slices[i].hue;
+            s = slices[i].saturation;
+            v = slices[i].value;
+            text = slices[i].text;
+
+            gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, full_radius);
+            // White center
+            gradient.addColorStop(0, '#fff');
+            gradient.addColorStop(0.24, '#fff');
+            // Inner edge
+            gradient.addColorStop(0.25, hsva_str(h, 0.4 * s, v, 1));
+            // Glow from the middle
+            gradient.addColorStop(0.26, hsva_str(h, 0.3 * s, v, 1));
+            gradient.addColorStop(0.81, hsva_str(h, s, v, 1));
+            // Rounded, beveled edge
+            gradient.addColorStop(0.82, hsva_str(h, s, 0.6 * v, 1));
+            gradient.addColorStop(0.89, hsva_str(h, s, 0.8 * v, 1));
+            // Simulated reflection on the edge
+            gradient.addColorStop(0.95, hsva_str(h, 0.8 * s, v, 1));
+            gradient.addColorStop(1, hsva_str(h, s, v, 1));
+            ctx.fillStyle = gradient;
+
+            // Draw the slice.
             ctx.beginPath();
             ctx.moveTo(0, 0);
             ctx.arc(0, 0, full_radius - 1, s0, e0, false);
@@ -103,13 +112,53 @@ var activate_wheel;
             ctx.closePath();
             ctx.fill();
 
+            // Draw a simulation of the personal image.
             ctx.beginPath();
-            ctx.arc(0, 0, full_radius * 0.8, s1, e1, false);
-            ctx.arc(0, 0, full_radius * 0.3, e2, s2, true);
+            ctx.arc(0, 0, full_radius * 0.77, s1, e1, false);
+            ctx.arc(0, 0, full_radius * 0.30, e2, s2, true);
             ctx.closePath();
-            ctx.strokeStyle = '#000';
             ctx.fillStyle = '#ccc';
             ctx.fill();
+
+            // Measure the text and shrink it if necessary.
+            text_height = Math.floor(0.11 * full_radius);
+            ctx.font = 'bold ' + text_height + 'px sans';
+            text_width = ctx.measureText(text).width;
+            text_circumference = (full_radius * 0.87) * (2 * Math.PI);
+            max_text_width = text_circumference / slices.length - 30;
+            if (text_width > max_text_width) {
+                // Shrink the text to fit.
+                text_height = Math.floor(text_height * max_text_width / text_width);
+                ctx.font = 'bold ' + text_height + 'px sans';
+                text_width = ctx.measureText(text).width;
+            }
+
+            // Determine the rotation of each character.
+            text_angles = [];
+            for (j = 0; j < text.length; j += 1) {
+                text_x = -text_width / 2 + ctx.measureText(text.substr(0, j)).width;
+                // Convert text_x to radians.
+                text_angles.push((text_x / text_circumference) * (2 * Math.PI));
+            }
+
+            // Stroke the text.
+            ctx.strokeStyle = hsva_str(h, s, 0.75 * v, 1);
+            ctx.lineWidth = 1;
+            for (j = 0; j < text.length; j += 1) {
+                ctx.save();
+                ctx.rotate(text_angles[j]);
+                ctx.strokeText(text[j], 0, -full_radius * 0.87);
+                ctx.restore();
+            }
+
+            // Fill the text.
+            ctx.fillStyle = '#fff';
+            for (j = 0; j < text.length; j += 1) {
+                ctx.save();
+                ctx.rotate(text_angles[j]);
+                ctx.fillText(text[j], 0, -full_radius * 0.87);
+                ctx.restore();
+            }
 
             ctx.restore();
         }
